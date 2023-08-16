@@ -1,7 +1,6 @@
-import streamlit as st
-import math
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+import streamlit as st
 
 
 def widmark_bac(weight_grams: float, alcohol_grams: float, windmark_factor: float):
@@ -66,8 +65,8 @@ def main():
     add_drink = st.button("Add Drink")
 
     if add_drink:
-        existing_drinks = drinks.get(drink_time_option, 0)
-        drinks[drink_time_option] = existing_drinks + drink_amount
+        existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
+        st.session_state.drinks[drink_time_option] = existing_drinks + drink_amount
 
     alcohol_buffer = 0
     bac_timesteps = []
@@ -79,7 +78,7 @@ def main():
 
     while True:
         value = bac_timesteps[counter - 1] if counter > 0 else 0
-        drinks_at_time = drinks.get(counter, 0)
+        drinks_at_time = st.session_state.drinks.get(counter, 0)
 
         alcohol_buffer += drinks_to_grams(drinks_at_time)
         grams_absorbed = min(alcohol_buffer, absorption_rate)
@@ -100,8 +99,9 @@ def main():
             break
         if (session_length > counter > last_entered_drink_timestep or counter < (
                 last_entered_drink_timestep - absorption_minutes)) and value <= drinking_threshold and alcohol_buffer <= 0:
-            drinks[counter + 1] = 1
-            last_entered_drink_timestep = max(drinks.keys())
+            st.session_state.drinks[counter + 1] = st.session_state.drinks.get(counter + 1,
+                                                                               0) + 1  # Increment the drink amount
+            last_entered_drink_timestep = max(st.session_state.drinks.keys())
 
         counter += 1
 
@@ -111,7 +111,7 @@ def main():
     with col1:
         st.dataframe(bac_df)
     with col2:
-        drinks_df = pd.DataFrame.from_dict(drinks, orient='index', columns=['Amount'])
+        drinks_df = pd.DataFrame.from_dict(st.session_state.drinks, orient='index', columns=['Amount'])
         drinks_df.index.name = 'Drink Time'
         st.dataframe(drinks_df)
 
@@ -119,12 +119,14 @@ def main():
     ax.plot(bac_df['timestep'], bac_df['BAC'])
     ax.set_xlabel('Timestep (minutes)')
     ax.set_ylabel('BAC')
-    for drink_time in drinks.keys():
+    for drink_time in st.session_state.drinks.keys():
         ax.axvline(x=drink_time, color='red', linestyle='--')
     ax.set_title('Time vs BAC')
     st.pyplot(fig)
 
 
 if __name__ == '__main__':
-    drinks = {}
+    if 'drinks' not in st.session_state:
+        st.session_state.drinks = {}
+
     main()
