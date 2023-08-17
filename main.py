@@ -1,11 +1,10 @@
-import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 
 def widmark_bac(weight_grams: float, alcohol_grams: float, windmark_factor: float):
-    bac = alcohol_grams / (weight_grams * windmark_factor) * 100
-    return bac
+    return alcohol_grams / (weight_grams * windmark_factor) * 100
 
 
 def pounds_to_grams(pounds):
@@ -40,33 +39,52 @@ def calculate_windmark_factor(weight: float, height: float, male: bool):
 
 
 def calculate_metabolise(minutes):
-    metabolism_rate_per_min = (0.015 / 60)
-    return metabolism_rate_per_min * minutes
+    return (0.015 / 60) * minutes
 
 
 def main():
-    st.title("BAC and Time Analysis")
+    st.set_page_config(page_title="BAC and Time Analysis")
 
-    weight = st.number_input("Enter your body weight (lbs):", value=145)
-    height = st.number_input("Enter your height (cm):", value=177.8)
-    is_male = st.checkbox("Male", True)
+    with st.sidebar:
+        st.title("BAC and Time Analysis")
+        st.write("Calculate your BAC via this handy calculator.")
 
-    drinking_threshold = st.number_input("Enter your BAC threshold:", value=0.05)
+        if st.button("Reset All"):
+            st.session_state.clear()
 
-    absorption_minutes = st.number_input("Enter the time (in minutes) to absorb a drink:", value=15)
+    if 'drinks' not in st.session_state:
+        st.session_state.drinks = {}
 
-    session_length = st.number_input("How long, in minutes, do you want to drink for?", value=60)
+    tab1, tab2, tab3 = st.tabs(["Profile", "Party", "Drinks"])
+
+    with tab1:
+        weight = st.number_input("Enter your body weight (lbs):", value=145)
+        height = st.number_input("Enter your height (cm):", value=177.8)
+        absorption_minutes = st.number_input("Enter the time (in minutes) that it takes you to absorb a drink:",
+                                             value=15)
+
+        sex = st.selectbox("Sex",("Male","Female"))
+
+        if sex == "Male":
+            is_male = True
+        else:
+            is_male = False
+
+
+    with tab2:
+        drinking_threshold = st.number_input("Enter your minimum BAC threshold:", value=0.05)
+        session_length = st.number_input("How long, in minutes, do you want to drink for?", value=60)
+
+    with tab3:
+        drink_time_option = st.number_input("Enter drink time (minutes after start):", 0)
+        drink_amount = st.number_input("Enter drink amount:", value=0)
+        add_drink = st.button("Add Drink")
+
+        if add_drink:
+            existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
+            st.session_state.drinks[drink_time_option] = existing_drinks + drink_amount
 
     wfactor = calculate_windmark_factor(weight, height, is_male)
-
-    drink_time_option = st.number_input("Select drink time (minutes after start):", 0)
-    drink_amount = st.number_input("Enter drink amount:", value=1)
-
-    add_drink = st.button("Add Drink")
-
-    if add_drink:
-        existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
-        st.session_state.drinks[drink_time_option] = existing_drinks + drink_amount
 
     alcohol_buffer = 0
     bac_timesteps = []
@@ -107,26 +125,27 @@ def main():
 
     bac_df = pd.DataFrame({'timestep': range(len(bac_timesteps)), 'BAC': bac_timesteps})
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.dataframe(bac_df)
-    with col2:
-        drinks_df = pd.DataFrame.from_dict(st.session_state.drinks, orient='index', columns=['Amount'])
-        drinks_df.index.name = 'Drink Time'
-        st.dataframe(drinks_df)
+    st.title("Results")
 
-    fig, ax = plt.subplots()
-    ax.plot(bac_df['timestep'], bac_df['BAC'])
-    ax.set_xlabel('Timestep (minutes)')
-    ax.set_ylabel('BAC')
+
+    drinks_df = pd.DataFrame.from_dict(st.session_state.drinks, orient='index', columns=['Amount'])
+    drinks_df.index.name = 'Drink Time'
+    st.dataframe(drinks_df)
+
+    # Create an interactive plot using Plotly
+    st.title("Time vs BAC")
+    fig = px.line(bac_df, x='timestep', y='BAC', title='Time vs BAC')
     for drink_time in st.session_state.drinks.keys():
-        ax.axvline(x=drink_time, color='red', linestyle='--')
-    ax.set_title('Time vs BAC')
-    st.pyplot(fig)
+        fig.add_shape(
+            type="line",
+            x0=drink_time, y0=0,
+            x1=drink_time, y1=max(bac_df['BAC']),
+            line=dict(color='red', dash='dash')
+        )
+
+    # Display the Plotly chart
+    st.plotly_chart(fig, use_container_width=True)
 
 
 if __name__ == '__main__':
-    if 'drinks' not in st.session_state:
-        st.session_state.drinks = {}
-
     main()
