@@ -2,7 +2,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-
 def widmark_bac(weight_grams: float, alcohol_grams: float, windmark_factor: float):
     return alcohol_grams / (weight_grams * windmark_factor) * 100
 
