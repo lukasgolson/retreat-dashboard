@@ -71,7 +71,8 @@ def main():
             is_male = False
 
     with tab2:
-        drinking_threshold = st.number_input("Enter your minimum BAC threshold:", value=0.05)
+        min_bac_threshold = st.number_input("Enter your minimum BAC threshold:", value=0.07)
+        max_bac_threshold = st.number_input("Enter your maximum BAC", value = 0.12)
         session_length = st.number_input("How long, in minutes, do you want to drink for?", value=60)
 
     with tab3:
@@ -80,7 +81,7 @@ def main():
         existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
 
         drink_amount = st.number_input("Enter drink amount:", value=existing_drinks)
-        add_drink = st.button("Add Drink")
+        add_drink = st.button("Set Drinks")
 
         if add_drink:
             st.session_state.drinks[drink_time_option] = drink_amount
@@ -119,7 +120,7 @@ def main():
         if zero_counter > 180 and counter > last_entered_drink_timestep and alcohol_buffer <= 0:
             break
         if (session_length > counter > last_entered_drink_timestep or counter < (
-                last_entered_drink_timestep - absorption_minutes)) and value <= drinking_threshold and alcohol_buffer <= 0:
+                last_entered_drink_timestep - absorption_minutes)) and value <= min_bac_threshold and alcohol_buffer <= 0:
             instance_drinks[counter + 1] = 1  # Increment the drink amount
             last_entered_drink_timestep = max(instance_drinks.keys())
 
