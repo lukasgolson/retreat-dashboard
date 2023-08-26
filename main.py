@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+
 def widmark_bac(weight_grams: float, alcohol_grams: float, windmark_factor: float):
     return alcohol_grams / (weight_grams * windmark_factor) * 100
 
@@ -62,26 +63,27 @@ def main():
         absorption_minutes = st.number_input("Enter the time (in minutes) that it takes you to absorb a drink:",
                                              value=15)
 
-        sex = st.selectbox("Sex",("Male","Female"))
+        sex = st.selectbox("Sex", ("Male", "Female"))
 
         if sex == "Male":
             is_male = True
         else:
             is_male = False
 
-
     with tab2:
         drinking_threshold = st.number_input("Enter your minimum BAC threshold:", value=0.05)
         session_length = st.number_input("How long, in minutes, do you want to drink for?", value=60)
 
     with tab3:
+
         drink_time_option = st.number_input("Enter drink time (minutes after start):", 0)
-        drink_amount = st.number_input("Enter drink amount:", value=0)
+        existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
+
+        drink_amount = st.number_input("Enter drink amount:", value=existing_drinks)
         add_drink = st.button("Add Drink")
 
         if add_drink:
-            existing_drinks = st.session_state.drinks.get(drink_time_option, 0)
-            st.session_state.drinks[drink_time_option] = existing_drinks + drink_amount
+            st.session_state.drinks[drink_time_option] = drink_amount
 
     wfactor = calculate_windmark_factor(weight, height, is_male)
 
@@ -93,9 +95,11 @@ def main():
     zero_counter = 0
     last_entered_drink_timestep = 0
 
+    instance_drinks = st.session_state.drinks.copy()
+
     while True:
         value = bac_timesteps[counter - 1] if counter > 0 else 0
-        drinks_at_time = st.session_state.drinks.get(counter, 0)
+        drinks_at_time = instance_drinks.get(counter, 0)
 
         alcohol_buffer += drinks_to_grams(drinks_at_time)
         grams_absorbed = min(alcohol_buffer, absorption_rate)
@@ -116,9 +120,8 @@ def main():
             break
         if (session_length > counter > last_entered_drink_timestep or counter < (
                 last_entered_drink_timestep - absorption_minutes)) and value <= drinking_threshold and alcohol_buffer <= 0:
-            st.session_state.drinks[counter + 1] = st.session_state.drinks.get(counter + 1,
-                                                                               0) + 1  # Increment the drink amount
-            last_entered_drink_timestep = max(st.session_state.drinks.keys())
+            instance_drinks[counter + 1] = 1  # Increment the drink amount
+            last_entered_drink_timestep = max(instance_drinks.keys())
 
         counter += 1
 
@@ -126,15 +129,15 @@ def main():
 
     st.title("Results")
 
-
-    drinks_df = pd.DataFrame.from_dict(st.session_state.drinks, orient='index', columns=['Amount'])
+    drinks_df = pd.DataFrame.from_dict(instance_drinks, orient='index', columns=['Amount'])
     drinks_df.index.name = 'Drink Time'
+
     st.dataframe(drinks_df)
 
     # Create an interactive plot using Plotly
     st.title("Time vs BAC")
     fig = px.line(bac_df, x='timestep', y='BAC', title='Time vs BAC')
-    for drink_time in st.session_state.drinks.keys():
+    for drink_time in instance_drinks.keys():
         fig.add_shape(
             type="line",
             x0=drink_time, y0=0,
